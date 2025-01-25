@@ -1,4 +1,7 @@
 import { Request, Response } from 'express';
+import { prisma } from '../../data/postgres';
+import { CreateTodoDto } from '../../domain/dtos/todos/create-todo.dto';
+import { UpdateTodoDTO } from '../../domain/dtos/todos/update-todo.dto';
 
 const todos = [
     { id: 1, text: 'Buy milk', createdAt: new Date() },
@@ -10,102 +13,86 @@ export class TodosController {
 
     constructor() { }
 
-    public getTodos = (req: Request, res: Response) => {
+    public getTodos = async (req: Request, res: Response) => {
+        const todos = await prisma.todo.findMany()
         res.json(todos);
     };
 
-    public getById = (req: Request, res: Response) => {
+    public getById = async (req: Request, res: Response) => {
         const id = Number(req.params.id);
 
-        if (isNaN(id)) {
-            res.status(404).json({ error: `ID argument is not a number` });
+        const todos = await prisma.todo.findUnique({
+            where: {
+                id
+            }
+        });
+
+        res.json(todos);
+
+    };
+
+    public createTodo = async (req: Request, res: Response) => {
+
+        const [error, createTodoDto] = CreateTodoDto.create(req.body);
+        
+        if(error){
+            res.status(400).json({error});
             return;
         }
-        const todo = todos.filter(element => element.id === id);
 
-        (todo.length > 0)
-            ? res.json(todo)
-            : res.status(404).json({ error: `TODO WITH id ${id} NOT FOUND` })
+            const todo = await prisma.todo.create({
+            data: createTodoDto!
+        })
 
-    };
-
-    public createTodo = (req: Request, res: Response) => {
-
-        const body = req.body;
-
-        if (!body.id) {
-            const getLastId = todos[todos.length - 1]
-            body.id = getLastId.id++;
-        }
-
-        if (!body.createdAt) {
-            body.createdAt = new Date();
-        }
-
-        todos.push(body);
-        res.json(body)
-
+        res.json(todo)
 
     };
 
-    public updateTodo = (req: Request, res: Response) => {
-
-        let { id, text, createdAt } = req.body ?? {};
+    public updateTodo = async (req: Request, res: Response) => {
+        let { text, createdAt } = req.body ?? {};
         const idParam = Number(req.params.id);
 
-        console.log(text);
 
-        if (!idParam) {
-            res.status(400).json({ error: 'you need provide an ID' });
-            return;
-        };
 
-        if (!text) {
-            res.status(400).json({ error: 'text not found' });
-            return;
-        };
+        const [error, updateTodoDto] = new UpdateTodoDTO(
+            idParam, 
+            text, 
+            createdAt
+        ).update();
 
-        if (!createdAt) {
-            createdAt = new Date();
+        
+
+
+        if(error){
+            res.status(400).json({error});
+            return;   
         }
 
-        const todo = todos.find( todo => todo.id === idParam);
-
-        if(!todo){
-            res.status(400).json({ error: 'ID not found' });
-        }else{
-            todo.text = text;
-            todo.createdAt = createdAt;
+        if(!updateTodoDto){
+            res.status(400).json({error});
+            return;      
         }
 
-        console.log(todos);
-        res.json(req.body)
+
+        const todo = await prisma.todo.update({
+            where: { id: idParam },
+            data: updateTodoDto.values
+        })
+
+        res.json(todo)
 
 
     };
 
-    public deleteTodo = (req: Request, res: Response) => {
+    public deleteTodo = async (req: Request, res: Response) => {
 
         const idParam = Number(req.params.id);
 
-        if (isNaN(idParam)) {
-            res.status(404).json({ error: `ID argument is not a number` });
-            return;
-        }
+        const todos = await prisma.todo.delete({
+            where: { id: idParam}
+        })
 
-        const todoIndex = todos.findIndex( todo => todo.id === idParam);
-
-        if(todoIndex === -1){
-            res.status(400).json({ error: 'ID not found' });
-        }else{
-
-            todos.splice(todoIndex, 1);
-            console.log(todos);
-            res.json(todos);
-
-        }
-
-
+        res.json(todos);
 
     };
 
