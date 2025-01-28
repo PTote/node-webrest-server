@@ -1,6 +1,6 @@
 export class UpdateTodoDTO {
 
-    private id: number;
+    public id: number;
     private text?: string | undefined;
     private createdAt?: Date | undefined;
 
